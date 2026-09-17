@@ -1,0 +1,12 @@
+line-length = 79
+target-version = "py311"
+
+[lint]
+select = ["A", "ANN", "B", "C4", "D", "E", "F", "I", "N", "RET", "SIM", "UP", "W"]
+ignore = ["D203", "D213"]
+
+[lint.per-file-ignores]
+"tests/*" = ["D100", "D103"]
+# Word lists read far better as prose split on whitespace than as a
+# 100-item Python list literal.
+"src/capsize_voice/profile.py" = ["SIM905"]
