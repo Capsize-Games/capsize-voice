@@ -31,6 +31,61 @@ class Exemplar:
     on_brand: bool
 
 
+def _passes_filters(
+    text: str,
+    words: list[str],
+    min_words: int,
+    max_words: int,
+    banned: re.Pattern[str] | None,
+    seen: set[str],
+) -> bool:
+    if not (min_words <= len(words) <= max_words):
+        return False
+    if banned and banned.search(text):
+        return False
+    if text.lower() in seen or text.startswith(("RT @", ">")):
+        return False
+    return not _ONLY_SYMBOLS.match(text)
+
+
+def _score(
+    text: str, words: list[str], onbrand: re.Pattern[str] | None
+) -> tuple[int, bool]:
+    is_on_brand = bool(onbrand and onbrand.search(text))
+    score = 3 if is_on_brand else 0
+    score += 2 if not _DEPENDENT.match(text) else 0
+    score += 2 if text.rstrip()[-1:] in ".!?" else 0
+    score += 1 if 10 <= len(words) <= 35 else 0
+    score += 1 if re.search(r"\d", text) else 0
+    return score, is_on_brand
+
+
+@dataclass(frozen=True)
+class _Options:
+    min_words: int
+    max_words: int
+    banned: re.Pattern[str] | None
+    onbrand: re.Pattern[str] | None
+
+
+def _rank(texts: list[str], options: _Options) -> list[Exemplar]:
+    seen: set[str] = set()
+    scored: list[Exemplar] = []
+    for raw in texts:
+        text = clean(raw)
+        words = text.split()
+        if not _passes_filters(
+            text, words, options.min_words, options.max_words,
+            options.banned, seen,
+        ):
+            continue
+        seen.add(text.lower())
+        score, is_on_brand = _score(text, words, options.onbrand)
+        scored.append(Exemplar(text=text, score=score, on_brand=is_on_brand))
+    scored.sort(key=lambda e: -e.score)
+    return scored
+
+
 def curate(
     texts: list[str],
     banned_terms: list[str] | None = None,
@@ -41,41 +96,14 @@ def curate(
 ) -> list[Exemplar]:
     """Filter and rank `texts`, returning the best `top_n` as exemplars.
 
-    `banned_terms` and `onbrand_terms` are the caller's own content
-    policy and topic focus — this package has no default opinion on
-    either; both are treated as case-insensitive substrings.
+    `banned_terms`/`onbrand_terms`: the caller's content policy and
+    topic focus, case-insensitive substrings, no built-in default.
     """
-    banned = _compile_terms(banned_terms)
-    onbrand = _compile_terms(onbrand_terms)
-
-    seen: set[str] = set()
-    scored: list[Exemplar] = []
-    for raw in texts:
-        text = clean(raw)
-        words = text.split()
-        if not (min_words <= len(words) <= max_words):
-            continue
-        if banned and banned.search(text):
-            continue
-        if text.lower() in seen:
-            continue
-        if text.startswith(("RT @", ">")):
-            continue
-        if _ONLY_SYMBOLS.match(text):
-            continue
-        seen.add(text.lower())
-
-        is_on_brand = bool(onbrand and onbrand.search(text))
-        score = 0
-        score += 3 if is_on_brand else 0
-        score += 2 if not _DEPENDENT.match(text) else 0
-        score += 2 if text.rstrip()[-1:] in ".!?" else 0
-        score += 1 if 10 <= len(words) <= 35 else 0
-        score += 1 if re.search(r"\d", text) else 0
-        scored.append(Exemplar(text=text, score=score, on_brand=is_on_brand))
-
-    scored.sort(key=lambda e: -e.score)
-    return scored[:top_n]
+    banned, onbrand = _compile_terms(banned_terms), _compile_terms(
+        onbrand_terms
+    )
+    options = _Options(min_words, max_words, banned, onbrand)
+    return _rank(texts, options)[:top_n]
 
 
 def _compile_terms(terms: list[str] | None) -> re.Pattern[str] | None:

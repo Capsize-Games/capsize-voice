@@ -9,6 +9,21 @@ from and improve, not a replacement for that judgment.
 from capsize_voice.profile import StyleProfile
 
 
+def _sections(
+    profile: StyleProfile, persona: str, rules: list[str] | None
+) -> list[str]:
+    sections = [persona.strip()] if persona else []
+    sections += [
+        _length_section(profile),
+        _sentence_section(profile),
+        _diction_section(profile),
+        _punctuation_section(profile),
+    ]
+    if rules:
+        sections.append(_rules_section(rules))
+    return sections
+
+
 def render_style_guide(
     profile: StyleProfile,
     persona: str = "",
@@ -21,18 +36,7 @@ def render_style_guide(
     formats to avoid) — this package has no opinion on what they should
     be, only that a caller can supply them.
     """
-    sections = []
-    if persona:
-        sections.append(persona.strip())
-
-    sections.append(_length_section(profile))
-    sections.append(_sentence_section(profile))
-    sections.append(_diction_section(profile))
-    sections.append(_punctuation_section(profile))
-    if rules:
-        sections.append(_rules_section(rules))
-
-    return "\n\n".join(sections) + "\n"
+    return "\n\n".join(_sections(profile, persona, rules)) + "\n"
 
 
 def _length_section(p: StyleProfile) -> str:
