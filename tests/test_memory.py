@@ -65,6 +65,25 @@ def test_extract_facts_passes_known_facts_into_prompt(
 
 
 @patch("capsize_voice.generate.openai.OpenAI")
+def test_extract_facts_prompt_tells_model_to_use_the_real_name(
+    mock_client_cls: MagicMock,
+) -> None:
+    mock_client_cls.return_value.chat.completions.create.return_value = (
+        _mock_response("[]")
+    )
+
+    extract_facts("key", "hi", "alice", [], model="m")
+
+    _, kwargs = (
+        mock_client_cls.return_value.chat.completions.create.call_args
+    )
+    system_prompt = kwargs["messages"][0]["content"]
+    user_prompt = kwargs["messages"][1]["content"]
+    assert "never as" in system_prompt.lower()
+    assert 'the name "alice"' in user_prompt
+
+
+@patch("capsize_voice.generate.openai.OpenAI")
 def test_extract_facts_rejects_non_json(
     mock_client_cls: MagicMock,
 ) -> None:

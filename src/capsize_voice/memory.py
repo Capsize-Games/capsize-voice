@@ -17,10 +17,12 @@ from capsize_voice.generate import (
 )
 
 _SYSTEM_PROMPT = (
-    "You track durable facts learned about the people in a conversation. "
-    "Given a message and the facts already known about its author, "
-    "return ONLY new, durable facts learned from this message - not "
-    "opinions, not small talk, not anything already known."
+    "You track durable facts learned about specific people in a "
+    "conversation. Given a message and the facts already known about "
+    "its sender, return ONLY new, durable facts learned from this "
+    "message - not opinions, not small talk, not anything already "
+    "known. Always refer to the sender by their given name, never as "
+    "'the author' or 'the user'."
 )
 
 _INSTRUCTION = """\
@@ -34,8 +36,9 @@ Facts already known about {author}:
 {message}
 </message>
 
-Return ONLY a JSON array of new facts, or [] if none. No commentary, \
-no markdown fence.
+Return ONLY a JSON array of new facts about {author}, each one using \
+the name "{author}" rather than "the author" or "the user". Return \
+[] if nothing new was learned. No commentary, no markdown fence.
 """
 
 
