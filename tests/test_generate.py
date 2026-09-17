@@ -181,6 +181,21 @@ def test_generate_candidates_raises_on_null_choices(
 
 
 @patch("capsize_voice.generate.openai.OpenAI")
+def test_generate_candidates_prompt_warns_against_fabrication(
+    mock_client_cls: MagicMock,
+) -> None:
+    mock_client_cls.return_value.chat.completions.create.return_value = (
+        _mock_response('["post"]')
+    )
+
+    generate_candidates("key", "style", ["ex"], "ctx", 1, model="m")
+
+    _, kwargs = mock_client_cls.return_value.chat.completions.create.call_args
+    prompt = kwargs["messages"][1]["content"]
+    assert "Do not invent specific facts" in prompt
+
+
+@patch("capsize_voice.generate.openai.OpenAI")
 def test_generate_reply_prompt_warns_against_fabrication(
     mock_client_cls: MagicMock,
 ) -> None:

@@ -40,6 +40,14 @@ rhythm and specificity. Do not imitate their subject matter.
 Write {n} distinct candidates about the context below, varying length \
 across them.
 
+Only state things given in the context below or already established \
+by the examples' own real subject matter (their real projects, their \
+real history). Do not invent specific facts, numbers, bugs, project \
+names, benchmarks, or events the context doesn't support - the \
+examples show HOW this person writes, not what is actually true \
+today. A short, general statement grounded in the real context beats \
+a specific-sounding but made-up one.
+
 Return ONLY a JSON array of strings. No commentary, no markdown fence.
 
 <context>
