@@ -20,10 +20,17 @@ pip install capsize-voice
 3. **Curates** a pool of your own real posts as few-shot exemplars —
    filtered for completeness and standalone-ness, ranked by how well
    they match your stated topics.
-4. **Generates** new candidate text in your voice from a topic/context,
-   via any OpenAI-compatible endpoint (OpenRouter, DeepInfra, OpenAI
-   itself, ...), seeded with your style guide and a random sample of
-   your real exemplars each time.
+4. **Generates** new candidate text in your voice — either several
+   candidates about a topic (`generate_candidates`, for a review queue)
+   or a single live reply to an incoming message (`generate_reply`, for
+   a conversation) — via any OpenAI-compatible endpoint (OpenRouter,
+   DeepInfra, OpenAI itself, ...), seeded with your style guide and a
+   random sample of your real exemplars each time.
+5. **Scores** a piece of text against your own weighted content rules
+   (`safety.score_text`) — plain regex categories with weights, not a
+   trained classifier, so a safety gate stays predictable and
+   inspectable. Useful for flagging a generated reply before it sends
+   and asking for another one instead.
 
 Every step is a plain function you can call directly; none of it needs
 the others; none of it needs an X archive specifically, either — `analyze`
@@ -74,6 +81,28 @@ candidates = generate_candidates(
     model="deepseek/deepseek-v4-flash-0731",
     extra_body={"provider": {"order": ["deepinfra"]}},  # OpenRouter-specific, optional
 )
+```
+
+### Conversational replies, safety-gated
+
+```python
+from capsize_voice import generate_reply, load_categories, score_text, is_flagged
+
+categories = load_categories([
+    {"id": "politics", "label": "Politics", "weight": 10, "terms": [r"\belection\b"]},
+])
+
+for _ in range(3):
+    reply = generate_reply(
+        api_key, guide, [e.text for e in exemplars],
+        message="what do you think about the election?", author="alice",
+        model="deepseek/deepseek-v4-flash-0731",
+    )
+    score = score_text(reply, categories)
+    if not is_flagged(score, threshold=1):
+        break  # send `reply`
+else:
+    ...  # every attempt was flagged; suppress instead of sending
 ```
 
 ## What this package has no opinion on

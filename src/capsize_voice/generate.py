@@ -10,13 +10,14 @@ that is the one interface every major router (OpenRouter, DeepInfra,
 Together, and the providers themselves) already speaks, so pointing this
 at a different `base_url` is the only thing switching providers needs.
 
-`generate_candidates`'s `model` argument has no default on purpose: a
-generic tool defaulting to one vendor's model would pick that cost and
-behavior for every caller who didn't think to override it. Its
-`extra_body` passes straight through to the request — on OpenRouter
-that's where a pinned provider order (`{"provider": {"order": [...]}}`)
-belongs, and it means this module never needs to know that concept
-exists.
+`generate_candidates` returns several candidates for a review queue;
+`generate_reply` returns one, for a live conversation that isn't going
+to wait on one. Both share `model`'s no-default rule: a generic tool
+defaulting to one vendor's model would pick that cost and behavior for
+every caller who didn't think to override it. Both take `extra_body`,
+passed straight through to the request — on OpenRouter that's where a
+pinned provider order (`{"provider": {"order": [...]}}`) belongs, and
+it means this module never needs to know that concept exists.
 """
 
 import json
@@ -44,6 +45,25 @@ Return ONLY a JSON array of strings. No commentary, no markdown fence.
 <context>
 {context}
 </context>
+"""
+
+_REPLY_INSTRUCTION = """\
+Follow the style guide above exactly. Below are {k} real examples of \
+this person's own writing, to match rhythm and specificity - do not \
+imitate their subject matter.
+
+<examples>
+{exemplars}
+</examples>
+
+Someone named {author} just said this to you in a conversation:
+
+<message>
+{message}
+</message>
+
+Reply in character, as a single short message. Return ONLY the reply \
+text - no commentary, no quotation marks, no "as an AI" framing.
 """
 
 
@@ -126,3 +146,39 @@ def generate_candidates(
     request = _Request(api_key, base_url, model, extra_body)
     text = _call_model(request, style_guide, prompt)
     return _parse_candidates(text)
+
+
+def _build_reply_prompt(
+    exemplars: list[str], message: str, author: str, k: int
+) -> str:
+    seeds = random.sample(exemplars, min(k, len(exemplars)))
+    return _REPLY_INSTRUCTION.format(
+        k=len(seeds),
+        exemplars="\n".join(f"- {s}" for s in seeds),
+        message=message,
+        author=author,
+    )
+
+
+def _strip_quotes(text: str) -> str:
+    if len(text) >= 2 and text[0] == text[-1] and text[0] in "\"'":
+        return text[1:-1].strip()
+    return text
+
+
+def generate_reply(
+    api_key: str,
+    style_guide: str,
+    exemplars: list[str],
+    message: str,
+    author: str,
+    model: str,
+    seed_count: int = 20,
+    base_url: str = DEFAULT_BASE_URL,
+    extra_body: dict[str, object] | None = None,
+) -> str:
+    """Return one reply to `message`, in the measured voice."""
+    _validate(api_key, exemplars)
+    prompt = _build_reply_prompt(exemplars, message, author, seed_count)
+    request = _Request(api_key, base_url, model, extra_body)
+    return _strip_quotes(_call_model(request, style_guide, prompt))

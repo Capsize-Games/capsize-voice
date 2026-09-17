@@ -2,7 +2,11 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from capsize_voice.generate import GenerationError, generate_candidates
+from capsize_voice.generate import (
+    GenerationError,
+    generate_candidates,
+    generate_reply,
+)
 
 
 def _mock_response(text: str) -> MagicMock:
@@ -84,3 +88,39 @@ def test_generate_candidates_rejects_non_json(
 
     with pytest.raises(GenerationError):
         generate_candidates("key", "style", ["ex"], "ctx", 2, model="m")
+
+
+@patch("capsize_voice.generate.openai.OpenAI")
+def test_generate_reply_returns_single_string(
+    mock_client_cls: MagicMock,
+) -> None:
+    mock_client_cls.return_value.chat.completions.create.return_value = (
+        _mock_response("that's a fair point")
+    )
+
+    result = generate_reply(
+        "key", "style", ["ex one", "ex two"], "hey what do you think?",
+        "alice", model="m",
+    )
+
+    assert result == "that's a fair point"
+
+
+@patch("capsize_voice.generate.openai.OpenAI")
+def test_generate_reply_strips_wrapping_quotes(
+    mock_client_cls: MagicMock,
+) -> None:
+    mock_client_cls.return_value.chat.completions.create.return_value = (
+        _mock_response('"quoted reply"')
+    )
+
+    result = generate_reply(
+        "key", "style", ["ex"], "hi", "alice", model="m"
+    )
+
+    assert result == "quoted reply"
+
+
+def test_generate_reply_requires_api_key() -> None:
+    with pytest.raises(GenerationError):
+        generate_reply("", "style", ["ex"], "hi", "alice", model="m")
