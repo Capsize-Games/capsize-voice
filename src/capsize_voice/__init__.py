@@ -6,6 +6,7 @@ from capsize_voice.generate import (
     generate_candidates,
     generate_reply,
 )
+from capsize_voice.memory import extract_facts
 from capsize_voice.profile import StyleProfile, analyze, clean
 from capsize_voice.render import render_style_guide
 from capsize_voice.safety import (
@@ -35,6 +36,7 @@ __all__ = [
     "analyze",
     "clean",
     "curate",
+    "extract_facts",
     "generate_candidates",
     "generate_reply",
     "is_flagged",
