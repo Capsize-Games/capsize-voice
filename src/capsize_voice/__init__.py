@@ -1,5 +1,6 @@
 """capsize_voice - measure a writer's voice, then generate more of it."""
 
+from capsize_voice.classify import should_interject
 from capsize_voice.exemplars import Exemplar, curate
 from capsize_voice.generate import (
     GenerationError,
@@ -45,4 +46,5 @@ __all__ = [
     "own_post_texts",
     "render_style_guide",
     "score_text",
+    "should_interject",
 ]

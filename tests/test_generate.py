@@ -143,3 +143,40 @@ def test_generate_reply_strips_wrapping_quotes(
 def test_generate_reply_requires_api_key() -> None:
     with pytest.raises(GenerationError):
         generate_reply("", "style", ["ex"], "hi", "alice", model="m")
+
+
+@patch("capsize_voice.generate.openai.OpenAI")
+def test_generate_reply_folds_recent_turns_into_prompt(
+    mock_client_cls: MagicMock,
+) -> None:
+    mock_client_cls.return_value.chat.completions.create.return_value = (
+        _mock_response("welcome!")
+    )
+
+    generate_reply(
+        "key", "style", ["ex"], "hi", "alice", model="m",
+        recent_turns=[
+            ("alice", "just moved to Austin"),
+            ("capsize", "oh nice, welcome"),
+        ],
+    )
+
+    _, kwargs = mock_client_cls.return_value.chat.completions.create.call_args
+    prompt = kwargs["messages"][1]["content"]
+    assert "alice: just moved to Austin" in prompt
+    assert "capsize: oh nice, welcome" in prompt
+
+
+@patch("capsize_voice.generate.openai.OpenAI")
+def test_generate_reply_with_no_recent_turns_shows_placeholder(
+    mock_client_cls: MagicMock,
+) -> None:
+    mock_client_cls.return_value.chat.completions.create.return_value = (
+        _mock_response("hi")
+    )
+
+    generate_reply("key", "style", ["ex"], "hi", "alice", model="m")
+
+    _, kwargs = mock_client_cls.return_value.chat.completions.create.call_args
+    prompt = kwargs["messages"][1]["content"]
+    assert "(none yet)" in prompt

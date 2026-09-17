@@ -56,6 +56,13 @@ imitate their subject matter.
 {exemplars}
 </examples>
 
+Recent conversation so far, oldest first - there may be more than one \
+other speaker:
+
+<history>
+{history}
+</history>
+
 Someone named {author} just said this to you in a conversation:
 
 <message>
@@ -174,13 +181,24 @@ def generate_candidates(
     return _parse_candidates(text)
 
 
+def _format_history(recent_turns: list[tuple[str, str]] | None) -> str:
+    if not recent_turns:
+        return "(none yet)"
+    return "\n".join(f"- {speaker}: {text}" for speaker, text in recent_turns)
+
+
 def _build_reply_prompt(
-    exemplars: list[str], message: str, author: str, k: int
+    exemplars: list[str],
+    message: str,
+    author: str,
+    recent_turns: list[tuple[str, str]] | None,
+    k: int,
 ) -> str:
     seeds = random.sample(exemplars, min(k, len(exemplars)))
     return _REPLY_INSTRUCTION.format(
         k=len(seeds),
         exemplars="\n".join(f"- {s}" for s in seeds),
+        history=_format_history(recent_turns),
         message=message,
         author=author,
     )
@@ -199,12 +217,22 @@ def generate_reply(
     message: str,
     author: str,
     model: str,
+    recent_turns: list[tuple[str, str]] | None = None,
     seed_count: int = 20,
     base_url: str = DEFAULT_BASE_URL,
     extra_body: dict[str, object] | None = None,
 ) -> str:
-    """Return one reply to `message`, in the measured voice."""
+    """Return one reply to `message`, in the measured voice.
+
+    `recent_turns` is a `(speaker, text)` list, oldest first - short-
+    term conversational context, distinct from any durable memory the
+    caller folds into `style_guide` itself. Renders as a `(none yet)`
+    placeholder when empty, so a conversation's first turn never has a
+    missing/malformed history block.
+    """
     _validate(api_key, exemplars)
-    prompt = _build_reply_prompt(exemplars, message, author, seed_count)
+    prompt = _build_reply_prompt(
+        exemplars, message, author, recent_turns, seed_count
+    )
     request = _Request(api_key, base_url, model, extra_body)
     return _strip_quotes(_call_model(request, style_guide, prompt))
