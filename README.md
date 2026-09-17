@@ -21,8 +21,9 @@ pip install capsize-voice
    filtered for completeness and standalone-ness, ranked by how well
    they match your stated topics.
 4. **Generates** new candidate text in your voice from a topic/context,
-   via Claude, seeded with your style guide and a random sample of your
-   real exemplars each time.
+   via any OpenAI-compatible endpoint (OpenRouter, DeepInfra, OpenAI
+   itself, ...), seeded with your style guide and a random sample of
+   your real exemplars each time.
 
 Every step is a plain function you can call directly; none of it needs
 the others; none of it needs an X archive specifically, either — `analyze`
@@ -41,9 +42,15 @@ capsize-voice analyze ~/Downloads/twitter-2026-01-01 \
   --onbrand-terms code python software open-source \
   --out voice.json
 
-export ANTHROPIC_API_KEY=sk-ant-...
-capsize-voice generate voice.json --context "shipped a new feature today"
+export OPENROUTER_API_KEY=sk-or-...
+capsize-voice generate voice.json --context "shipped a new feature today" \
+  --model deepseek/deepseek-v4-flash-0731 --provider deepinfra
 ```
+
+`--api-key-env` reads a different environment variable if you'd rather
+not use `OPENROUTER_API_KEY`; `--base-url` points at a different
+OpenAI-compatible endpoint entirely (OpenAI itself, a self-hosted
+vLLM/DeepInfra deployment, ...).
 
 `analyze` never executes the archive's `tweets.js` — it's read as data,
 stripped of its JS assignment wrapper, and parsed as JSON.
@@ -64,6 +71,8 @@ exemplars = curate(my_posts, banned_terms=["politics"])
 candidates = generate_candidates(
     api_key, guide, [e.text for e in exemplars],
     context="shipped a new feature today", count=6,
+    model="deepseek/deepseek-v4-flash-0731",
+    extra_body={"provider": {"order": ["deepinfra"]}},  # OpenRouter-specific, optional
 )
 ```
 
@@ -77,9 +86,11 @@ candidates = generate_candidates(
   whatever text you hand it and writes whatever file you tell `analyze`
   to. Keeping your own archive and your generated `voice.json` somewhere
   durable is on you.
-- Which model generates your text. `generate_candidates` takes a `model`
-  argument (default `claude-opus-5`); swapping it for another Anthropic
-  model needs no other change.
+- Which model generates your text, or which provider serves it.
+  `generate_candidates` takes a required `model` and an optional
+  `base_url` (default `https://openrouter.ai/api/v1`) plus an
+  `extra_body` passthrough for provider-specific routing — pointing this
+  at a different OpenAI-compatible endpoint needs no other change.
 
 ## NLTK data
 

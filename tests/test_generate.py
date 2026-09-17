@@ -1,4 +1,3 @@
-import json
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -6,52 +5,82 @@ import pytest
 from capsize_voice.generate import GenerationError, generate_candidates
 
 
-def _mock_response(candidates: list[str]) -> MagicMock:
-    block = MagicMock()
-    block.type = "text"
-    block.text = json.dumps(candidates)
+def _mock_response(text: str) -> MagicMock:
+    message = MagicMock()
+    message.content = text
+    choice = MagicMock()
+    choice.message = message
     response = MagicMock()
-    response.content = [block]
+    response.choices = [choice]
     return response
 
 
-@patch("capsize_voice.generate.anthropic.Anthropic")
+@patch("capsize_voice.generate.openai.OpenAI")
 def test_generate_candidates_returns_parsed_list(
     mock_client_cls: MagicMock,
 ) -> None:
     mock_client = MagicMock()
-    mock_client.messages.create.return_value = _mock_response(
-        ["post one", "post two"]
+    mock_client.chat.completions.create.return_value = _mock_response(
+        '["post one", "post two"]'
     )
     mock_client_cls.return_value = mock_client
 
     result = generate_candidates(
-        "key", "style guide text", ["example one", "example two"], "ctx", 2
+        "key",
+        "style guide text",
+        ["example one", "example two"],
+        "ctx",
+        2,
+        model="deepseek/deepseek-v4-flash-0731",
     )
 
     assert result == ["post one", "post two"]
 
 
+@patch("capsize_voice.generate.openai.OpenAI")
+def test_generate_candidates_passes_model_and_extra_body(
+    mock_client_cls: MagicMock,
+) -> None:
+    mock_client = MagicMock()
+    mock_client.chat.completions.create.return_value = _mock_response("[]")
+    mock_client_cls.return_value = mock_client
+
+    generate_candidates(
+        "key",
+        "style",
+        ["ex"],
+        "ctx",
+        2,
+        model="deepseek/deepseek-v4-flash-0731",
+        base_url="https://openrouter.ai/api/v1",
+        extra_body={"provider": {"order": ["deepinfra"]}},
+    )
+
+    mock_client_cls.assert_called_once_with(
+        api_key="key", base_url="https://openrouter.ai/api/v1"
+    )
+    _, kwargs = mock_client.chat.completions.create.call_args
+    assert kwargs["model"] == "deepseek/deepseek-v4-flash-0731"
+    assert kwargs["extra_body"] == {"provider": {"order": ["deepinfra"]}}
+
+
 def test_generate_candidates_requires_api_key() -> None:
     with pytest.raises(GenerationError):
-        generate_candidates("", "style", ["ex"], "ctx", 2)
+        generate_candidates("", "style", ["ex"], "ctx", 2, model="m")
 
 
 def test_generate_candidates_requires_exemplars() -> None:
     with pytest.raises(GenerationError):
-        generate_candidates("key", "style", [], "ctx", 2)
+        generate_candidates("key", "style", [], "ctx", 2, model="m")
 
 
-@patch("capsize_voice.generate.anthropic.Anthropic")
+@patch("capsize_voice.generate.openai.OpenAI")
 def test_generate_candidates_rejects_non_json(
     mock_client_cls: MagicMock,
 ) -> None:
-    block = MagicMock()
-    block.type = "text"
-    block.text = "not json at all"
-    response = MagicMock()
-    response.content = [block]
-    mock_client_cls.return_value.messages.create.return_value = response
+    mock_client_cls.return_value.chat.completions.create.return_value = (
+        _mock_response("not json at all")
+    )
 
     with pytest.raises(GenerationError):
-        generate_candidates("key", "style", ["ex"], "ctx", 2)
+        generate_candidates("key", "style", ["ex"], "ctx", 2, model="m")

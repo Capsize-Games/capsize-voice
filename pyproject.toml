@@ -29,7 +29,7 @@ classifiers = [
 ]
 dependencies = [
     "nltk>=3.8",
-    "anthropic>=0.40",
+    "openai>=1.50",
 ]
 
 [project.optional-dependencies]

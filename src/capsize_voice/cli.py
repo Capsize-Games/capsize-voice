@@ -16,7 +16,7 @@ import sys
 from pathlib import Path
 
 from capsize_voice.exemplars import curate
-from capsize_voice.generate import generate_candidates
+from capsize_voice.generate import DEFAULT_BASE_URL, generate_candidates
 from capsize_voice.profile import analyze
 from capsize_voice.render import render_style_guide
 from capsize_voice.x_archive import load_archive, own_post_texts
@@ -51,13 +51,21 @@ def _cmd_analyze(args: argparse.Namespace) -> None:
 
 def _cmd_generate(args: argparse.Namespace) -> None:
     data = json.loads(Path(args.voice_file).read_text())
-    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+    api_key = os.environ.get(args.api_key_env, "")
+    extra_body: dict[str, object] | None = (
+        {"provider": {"order": args.provider, "allow_fallbacks": False}}
+        if args.provider
+        else None
+    )
     candidates = generate_candidates(
         api_key,
         data["style_guide"],
         data["exemplars"],
         args.context,
         args.count,
+        model=args.model,
+        base_url=args.base_url,
+        extra_body=extra_body,
     )
     for candidate in candidates:
         print(f"[{len(candidate):>3}c] {candidate}")
@@ -90,6 +98,21 @@ def build_parser() -> argparse.ArgumentParser:
     generate_cmd.add_argument("voice_file", help="output of `analyze`")
     generate_cmd.add_argument("--context", required=True)
     generate_cmd.add_argument("-n", "--count", type=int, default=6)
+    generate_cmd.add_argument(
+        "--model", required=True, help="e.g. deepseek/deepseek-v4-flash-0731"
+    )
+    generate_cmd.add_argument("--base-url", default=DEFAULT_BASE_URL)
+    generate_cmd.add_argument(
+        "--api-key-env",
+        default="OPENROUTER_API_KEY",
+        help="env var to read the API key from",
+    )
+    generate_cmd.add_argument(
+        "--provider",
+        nargs="*",
+        default=[],
+        help="pin the OpenRouter upstream provider order, e.g. deepinfra",
+    )
     generate_cmd.set_defaults(func=_cmd_generate)
 
     return parser

@@ -1,17 +1,22 @@
 """Ask an LLM for candidate posts in a measured voice.
 
 The style guide (see `render.render_style_guide`, or your own hand-tuned
-text) goes in as a cached system prompt; a handful of the writer's real
-posts go in as few-shot exemplars; the model is asked for a JSON array of
-distinct candidates about a given context.
+text) goes in as a system prompt; a handful of the writer's real posts go
+in as few-shot exemplars; the model is asked for a JSON array of distinct
+candidates about a given context.
+
+Talks OpenAI-compatible chat completions, not any one vendor's own SDK —
+that is the one interface every major router (OpenRouter, DeepInfra,
+Together, and the providers themselves) already speaks, so pointing this
+at a different `base_url` is the only thing switching providers needs.
 """
 
 import json
 import random
 
-import anthropic
+import openai
 
-DEFAULT_MODEL = "claude-opus-5"
+DEFAULT_BASE_URL = "https://openrouter.ai/api/v1"
 
 _INSTRUCTION = """\
 Follow the style guide above exactly - especially the length targets. \
@@ -43,10 +48,20 @@ def generate_candidates(
     exemplars: list[str],
     context: str,
     count: int,
+    model: str,
     seed_count: int = 20,
-    model: str = DEFAULT_MODEL,
+    base_url: str = DEFAULT_BASE_URL,
+    extra_body: dict[str, object] | None = None,
 ) -> list[str]:
-    """Return up to `count` distinct candidate posts about `context`."""
+    """Return up to `count` distinct candidate posts about `context`.
+
+    `model` has no default on purpose: a generic tool defaulting to one
+    vendor's model would pick that cost and behavior for every caller
+    who didn't think to override it. `extra_body` passes straight
+    through to the request — on OpenRouter that's where a pinned
+    provider order (`{"provider": {"order": [...]}}`) belongs, and it
+    means this function never needs to know that concept exists.
+    """
     if not api_key:
         raise GenerationError("no API key configured")
     if not exemplars:
@@ -60,26 +75,20 @@ def generate_candidates(
         context=context,
     )
 
-    client = anthropic.Anthropic(api_key=api_key)
+    client = openai.OpenAI(api_key=api_key, base_url=base_url)
     try:
-        response = client.messages.create(
+        response = client.chat.completions.create(
             model=model,
-            max_tokens=4000,
-            system=[
-                {
-                    "type": "text",
-                    "text": style_guide,
-                    "cache_control": {"type": "ephemeral"},
-                }
+            messages=[
+                {"role": "system", "content": style_guide},
+                {"role": "user", "content": prompt},
             ],
-            messages=[{"role": "user", "content": prompt}],
+            extra_body=extra_body or {},
         )
-    except anthropic.APIError as exc:
+    except openai.OpenAIError as exc:
         raise GenerationError(str(exc)) from exc
 
-    text = "".join(
-        block.text for block in response.content if block.type == "text"
-    ).strip()
+    text = (response.choices[0].message.content or "").strip()
     if text.startswith("```"):
         text = text.split("\n", 1)[1].rsplit("```", 1)[0]
     try:
