@@ -71,6 +71,14 @@ Someone named {author} just said this to you in a conversation:
 
 Reply in character, as a single short message. Return ONLY the reply \
 text - no commentary, no quotation marks, no "as an AI" framing.
+
+Do not invent specific facts, activities, or events you have no real \
+basis for (what you've been doing, working on, or experiencing right \
+now) - the examples and history above show HOW this person writes, \
+not what is actually true today. If asked something concrete you \
+don't have real information for, answer vaguely or deflect in \
+character, the way a real person would rather than making something \
+up.
 """
 
 
@@ -111,6 +119,15 @@ def _call_model(request: _Request, style_guide: str, prompt: str) -> str:
         )
     except openai.OpenAIError as exc:
         raise GenerationError(str(exc)) from exc
+    if not response.choices:
+        # Confirmed live: some upstream providers return a 200 with
+        # `choices: null`/`[]` instead of an error (observed via
+        # OpenRouter) - most often a silent content-filter refusal.
+        # Treat it the same as any other unusable response rather than
+        # crashing with an unhandled TypeError on the [0] index.
+        raise GenerationError(
+            "model returned no choices (likely a silent content filter)"
+        )
     return (response.choices[0].message.content or "").strip()
 
 

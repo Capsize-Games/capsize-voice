@@ -19,6 +19,12 @@ def _mock_response(text: str) -> MagicMock:
     return response
 
 
+def _mock_response_no_choices() -> MagicMock:
+    response = MagicMock()
+    response.choices = None
+    return response
+
+
 @patch("capsize_voice.generate.openai.OpenAI")
 def test_generate_candidates_returns_parsed_list(
     mock_client_cls: MagicMock,
@@ -143,6 +149,50 @@ def test_generate_reply_strips_wrapping_quotes(
 def test_generate_reply_requires_api_key() -> None:
     with pytest.raises(GenerationError):
         generate_reply("", "style", ["ex"], "hi", "alice", model="m")
+
+
+@patch("capsize_voice.generate.openai.OpenAI")
+def test_generate_reply_raises_on_null_choices(
+    mock_client_cls: MagicMock,
+) -> None:
+    """Confirmed live: some upstream providers return choices=null.
+
+    (a silent content-filter refusal) instead of an SDK-level error -
+    this must surface as GenerationError, not crash the caller.
+    """
+    mock_client_cls.return_value.chat.completions.create.return_value = (
+        _mock_response_no_choices()
+    )
+
+    with pytest.raises(GenerationError):
+        generate_reply("key", "style", ["ex"], "hi", "alice", model="m")
+
+
+@patch("capsize_voice.generate.openai.OpenAI")
+def test_generate_candidates_raises_on_null_choices(
+    mock_client_cls: MagicMock,
+) -> None:
+    mock_client_cls.return_value.chat.completions.create.return_value = (
+        _mock_response_no_choices()
+    )
+
+    with pytest.raises(GenerationError):
+        generate_candidates("key", "style", ["ex"], "ctx", 2, model="m")
+
+
+@patch("capsize_voice.generate.openai.OpenAI")
+def test_generate_reply_prompt_warns_against_fabrication(
+    mock_client_cls: MagicMock,
+) -> None:
+    mock_client_cls.return_value.chat.completions.create.return_value = (
+        _mock_response("hi")
+    )
+
+    generate_reply("key", "style", ["ex"], "hi", "alice", model="m")
+
+    _, kwargs = mock_client_cls.return_value.chat.completions.create.call_args
+    prompt = kwargs["messages"][1]["content"]
+    assert "Do not invent specific facts" in prompt
 
 
 @patch("capsize_voice.generate.openai.OpenAI")
