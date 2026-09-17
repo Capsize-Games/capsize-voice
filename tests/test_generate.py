@@ -91,6 +91,25 @@ def test_generate_candidates_rejects_non_json(
 
 
 @patch("capsize_voice.generate.openai.OpenAI")
+def test_generate_candidates_merges_split_arrays(
+    mock_client_cls: MagicMock,
+) -> None:
+    """deepseek-v4.1-flash sometimes returns N separate 1-item arrays.
+
+    Instead of one N-item array when asked for N candidates.
+    """
+    mock_client_cls.return_value.chat.completions.create.return_value = (
+        _mock_response('["post one"]\n\n["post two"]\n\n["post three"]')
+    )
+
+    result = generate_candidates(
+        "key", "style", ["ex"], "ctx", 3, model="m"
+    )
+
+    assert result == ["post one", "post two", "post three"]
+
+
+@patch("capsize_voice.generate.openai.OpenAI")
 def test_generate_reply_returns_single_string(
     mock_client_cls: MagicMock,
 ) -> None:

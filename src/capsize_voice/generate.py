@@ -107,15 +107,41 @@ def _call_model(request: _Request, style_guide: str, prompt: str) -> str:
     return (response.choices[0].message.content or "").strip()
 
 
-def _parse_candidates(text: str) -> list[str]:
-    if text.startswith("```"):
-        text = text.split("\n", 1)[1].rsplit("```", 1)[0]
+def _decode_next(
+    decoder: json.JSONDecoder, text: str, idx: int
+) -> tuple[object, int]:
     try:
-        candidates = json.loads(text)
+        return decoder.raw_decode(text, idx)
     except json.JSONDecodeError as exc:
         raise GenerationError(
             f"model did not return JSON: {text[:200]}"
         ) from exc
+
+
+def _parse_json_arrays(text: str) -> list[object]:
+    """Parse one or more whitespace-separated JSON array literals.
+
+    Tolerates a model returning N separate 1-item arrays instead of
+    one N-item array (observed with deepseek-v4.1-flash).
+    """
+    decoder = json.JSONDecoder()
+    items: list[object] = []
+    idx = 0
+    text = text.strip()
+    while idx < len(text):
+        while idx < len(text) and text[idx].isspace():
+            idx += 1
+        if idx >= len(text):
+            break
+        value, idx = _decode_next(decoder, text, idx)
+        items.extend(value if isinstance(value, list) else [value])
+    return items
+
+
+def _parse_candidates(text: str) -> list[str]:
+    if text.startswith("```"):
+        text = text.split("\n", 1)[1].rsplit("```", 1)[0]
+    candidates = _parse_json_arrays(text)
     return [c.strip() for c in candidates if isinstance(c, str) and c.strip()]
 
 
