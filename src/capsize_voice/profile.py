@@ -11,9 +11,9 @@ import re
 import statistics
 from collections import Counter
 from dataclasses import dataclass, field
-from typing import TypedDict
 
 from nltk import pos_tag, sent_tokenize, word_tokenize
+from typing_extensions import TypedDict
 
 from capsize_voice.nltk_setup import ensure_nltk_data
 

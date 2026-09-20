@@ -30,6 +30,7 @@ classifiers = [
 dependencies = [
     "nltk>=3.8",
     "openai>=1.50",
+    "typing-extensions>=4.7",
 ]
 
 [project.optional-dependencies]
