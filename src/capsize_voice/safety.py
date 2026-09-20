@@ -11,7 +11,8 @@ where the threshold sits; both are the caller's own content policy.
 
 import re
 from dataclasses import dataclass
-from typing import TypedDict
+
+from typing_extensions import TypedDict
 
 
 class CategoryData(TypedDict):
