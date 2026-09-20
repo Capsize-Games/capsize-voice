@@ -1,0 +1,26 @@
+{
+  "$schema": "https://capsize.dev/schemas/capsize-1.json",
+  "schema_version": 1,
+  "standards": "1.x",
+  "name": "capsize-voice",
+  "type": "library",
+  "languages": ["python"],
+  "runtimes": {"python": ">=3.11"},
+  "entrypoints": {"python": "capsize_voice", "cli": "capsize-voice"},
+  "task_runner": "just",
+  "commands": {
+    "setup": "setup",
+    "build": "build",
+    "test": "test",
+    "lint": "lint",
+    "format": "format",
+    "typecheck": "typecheck",
+    "run": null,
+    "clean": null,
+    "docs": null,
+    "ci": "ci"
+  },
+  "dependencies": {"python": "pyproject.toml"},
+  "owner": "Capsize-Games",
+  "license": "MIT"
+}
